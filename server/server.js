@@ -11,10 +11,11 @@ module.exports = function( basePath, port, debug ) {
 	function log() {
 		if ( debug ) {
 			var args = Array.prototype.slice.call( arguments );
-			args.unshift( "[CR]" );
+			args[0] = "[CR] " + args[0];
 			console.log.apply( console, args );
 		}
 	}
+
 	var server = socketio.listen( port, {
 		"resource": "/cr",
 		"log level": debug ? 5 : 1,
@@ -39,7 +40,7 @@ module.exports = function( basePath, port, debug ) {
 	gaze( paths, function() {
 		this.on( "changed", function( fullFile ) {
 			var file = fullFile.replace( basePath, "" );
-			console.log( "File '%s' changed", file );
+			console.log( "[CR] File '%s' changed", file );
 
 			if ( file === "/client/css-reload.js" ) {
 				server.sockets.emit( "reloadPage" );
@@ -58,14 +59,16 @@ module.exports = function( basePath, port, debug ) {
 
 	function fetchFile( fullFile, callback ) {
 		// todo: support external URLs as well?
-		callback( fs.readFileSync( fullFile ).toString() );
 		log( "Read contents of file '%s'", fullFile );
+		callback( fs.readFileSync( fullFile ).toString() );
 	}
 
 	function watchFile( socket, file ) {
 		var fullFile = path.normalize( basePath + file );
 		var cache = watchCache[fullFile] = watchCache[fullFile] || [];
+
 		cache.push( socket );
+
 		socket.on( "disconnect", function( ) {
 			log( "Stopped watching '%s' for socket '%s'", file, socket.id );
 			cache.splice( cache.indexOf( socket ), 1 );
