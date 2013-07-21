@@ -1,5 +1,5 @@
 @import "typography.css";
-@import "mediaqueries.css";
+@import "mediaqueries.css" screen;
 @import url("test.css") (device-width: 1020px);
 * {
 	padding: 6px;

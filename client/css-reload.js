@@ -137,7 +137,7 @@
 	 */
 	function updateImports( file, content ) {
 		var re_comment = /\/\*([\s\S]+)?\*\//g;
-		var re_import = /@import (?:url\s*\(\s*)?['"](.+?)['"](?:\s*\)\s*)?(?:\s+([^;\n]+))?(?:;)?/g;
+		var re_import = /@import (?:url\()?\s*["'](.+?)["']\s*(?:\))?\s*(?:(.+?))?;/g
 		var m1;
 		var m2;
 		var style;
