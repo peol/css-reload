@@ -1,0 +1,15 @@
+#!/usr/bin/env node
+
+"use strict";
+
+var program = require( "commander" );
+var path = require( "path" );
+
+program.option( "-p, --port <port>", "which port to run the server on (default 51000)", 51000 );
+program.option( "-d, --dir <path>", "which path to use as root (default current directory)", process.cwd( ) );
+program.option( "-D, --debug", "enable debug output (default false)", false );
+program.parse( process.argv );
+
+var basePath = path.normalize( path.resolve( program.dir + "/" ) );
+
+require( "../server/server" )( basePath, +program.port, !! program.debug );
