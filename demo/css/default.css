@@ -1,0 +1,6 @@
+@import "typography.css";
+@import "mediaqueries.css";
+@import url("test.css") (device-width: 1020px);
+* {
+	padding: 6px;
+}
