@@ -76,9 +76,13 @@ module.exports = function( basePath, port, debug ) {
 	}
 
 	server.on( "connection", function( socket ) {
+		console.log( "[CR] Socket '%s' connected", socket.id );
 		socket.on( "fileAdded", function( file ) {
 			log( "Started watching '%s' for socket '%s'", file, socket.id );
 			watchFile( socket, file );
+		} );
+		socket.on( "disconnect", function() {
+			console.log( "[CR] Socket '%s' disconnected", socket.id );
 		} );
 	} );
 };
