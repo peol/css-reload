@@ -188,6 +188,13 @@
 				resource: "cr"
 			} );
 
+			socket.on( "connect", function() {
+				// make sure that any pre-parsed files are added to the server watch list:
+				filesToWatch.forEach( function( file ) {
+					socket.emit( "fileAdded", file );
+				} );
+			} );
+
 			socket.on( "reloadPage", function() {
 				// used by CR when developing, automatically refreshes page when the css-reload.js
 				// file is changed. Could potentially be used in cases where a total reload of the document is needed.
@@ -199,11 +206,6 @@
 				content = updateImports( file, content );
 				// update the CR <style> element with the new content:
 				set( file, content );
-			} );
-
-			// make sure that any pre-parsed files are added to the watch list:
-			filesToWatch.forEach( function( file ) {
-				socket.emit( "fileAdded", file );
 			} );
 		};
 
