@@ -2,7 +2,7 @@
 	"name": "css-reload",
 	"preferGlobal": true,
 	"version": "0.0.1",
-	"description": "Blazing fast live-reloader of CSS files, supports @import statements and reloading specific style sheets.",
+	"description": "Blazing fast live-reloader for CSS files, supports @import statements and reloading specific style sheets.",
 	"main": "bin/css-reload",
 	"bin": {
 		"css-reload": "./bin/css-reload"
