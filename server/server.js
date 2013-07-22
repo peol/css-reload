@@ -44,7 +44,7 @@ module.exports = function( basePath, port, debug ) {
 
 	console.log( "[CR] Port: %d", port );
 	console.log( "[CR] Base path: '%s'", basePath );
-	console.log( "[CR] Tag to add to your document: <script src=\"http://localhost:%d/lr/css-reload.js\"></script>", port );
+	console.log( "[CR] Tag to add to your document: <script src=\"http://localhost:%d/cr/css-reload.js\"></script>", port );
 
 	gaze( paths, function() {
 		this.on( "changed", function( fullFile ) {

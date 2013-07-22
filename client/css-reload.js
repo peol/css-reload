@@ -106,6 +106,7 @@
 
 		var file = normalize( style.href );
 		var content = "";
+
 		toArray( style.cssRules ).forEach( function( rule ) {
 			if ( rule instanceof CSSImportRule ) {
 				parseStyle( rule.styleSheet, rule.media );
@@ -179,8 +180,7 @@
 	 * automatically refreshes the internal caches.
 	 */
 	function run() {
-		var lrElem = document.querySelector( "script[src*='css-reload.js']" );
-		var url = lrElem.src.split( "/css-reload.js" )[0];
+		var url = document.querySelector( "script[src*='css-reload.js']" ).src.split( "/css-reload.js" )[0];
 		var ioElem = document.createElement( "script" );
 
 		ioElem.onload = function() {
@@ -189,7 +189,7 @@
 			} );
 
 			socket.on( "reloadPage", function() {
-				// used by LR when developing, automatically refreshes page when the css-reload.js
+				// used by CR when developing, automatically refreshes page when the css-reload.js
 				// file is changed. Could potentially be used in cases where a total reload of the document is needed.
 				location.reload();
 			} );
@@ -197,7 +197,7 @@
 			socket.on( "fileChanged", function( file, content ) {
 				// make sure we parse and clean the new content for @import's:
 				content = updateImports( file, content );
-				// update the LR <style> element with the new content:
+				// update the CR <style> element with the new content:
 				set( file, content );
 			} );
 
