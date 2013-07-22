@@ -1,27 +1,28 @@
 {
-	"name": "css-reload",
-	"preferGlobal": true,
-	"version": "0.0.1",
-	"description": "Blazing fast live-reloader for CSS files, supports @import statements and reloading specific style sheets.",
-	"main": "bin/css-reload",
-	"bin": {
-		"css-reload": "./bin/css-reload"
-	},
-	"keywords": [
-			"livereload",
-			"cssreload",
-			"reload",
-			"css"
-	],
-	"author": "Andrée Hansson",
-	"license": "MIT",
-	"dependencies": {
-		"socket.io": "~0.9.16",
-		"commander": "~2.0.0"
-	},
-	"devDependencies": {
-		"grunt-contrib-jshint": "~0.6.0",
-		"grunt-contrib-watch": "~0.5.1",
-		"grunt": "~0.4.1"
-	}
+  "name": "css-reload",
+  "preferGlobal": true,
+  "version": "0.0.1",
+  "description": "Blazing fast live-reloader for CSS files, supports @import statements and reloading specific style sheets.",
+  "main": "bin/css-reload",
+  "bin": {
+    "css-reload": "./bin/css-reload"
+  },
+  "keywords": [
+    "livereload",
+    "cssreload",
+    "reload",
+    "css"
+  ],
+  "author": "Andrée Hansson",
+  "license": "MIT",
+  "dependencies": {
+    "socket.io": "~0.9.16",
+    "commander": "~2.0.0",
+    "gaze": "~0.4.1"
+  },
+  "devDependencies": {
+    "grunt-contrib-jshint": "~0.6.0",
+    "grunt-contrib-watch": "~0.5.1",
+    "grunt": "~0.4.1"
+  }
 }
