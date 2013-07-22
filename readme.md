@@ -2,15 +2,16 @@
 This project is aimed to support css-reloading of CSS that not only uses `<link>` elements, but also `@import` statements. All CSS files are reloaded separately which means that re-paints in the browser should be rather fast compared to other css-reload projects.
 
 ## Installation
-css-reload works best as a globally installed binary, like so:
+css-reload is not on npm yet since it's early days. But you can test it out by checking out the source, it's very easy!
 ```
-$ npm install -g css-reload
-$ cd my/project/root
-$ css-reload
+$ git clone https://github.com/peol/css-reload.git
+$ cd css-reload
+$ npm install
+$ bin/css-reload -d /path/to/your/project/root
 ```
 The server will give you the link to the client JavaScript file that you put in your document. Once that's done you can start using it!
 
-For advanced options, you can look into the help:
+For other options, you can look into the help:
 ```
 $ css-reload --help
 
@@ -32,7 +33,7 @@ A: I wasn't happy with the ones I've tried (they either were too complex to set-
 
 Q: Why use `@import`'s anyways, aren't they bad from a performance perspective?
 
-A: Yes, they do have some performance problems in older browsers but `@import` is a common way to structure your CSS in projects that either uses pre-processors, and/or projects that use require.js -- which automatically inlines `@import`'s for production.
+A: Yes, they do have some performance problems in older browsers but `@import` is a (pretty) common way to structure your CSS in larger projects, and/or projects that use require.js -- which automatically inlines `@import`'s for production.
 
 ## How does it work?
 css-reload runs a server in a CLI using [socket.io](http://socket.io/) and file watchers. The client tells the server which files it wants to watch and automatically gets notifications when the files are changed.
