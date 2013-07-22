@@ -4,6 +4,7 @@
 
 var path = require( "path" );
 var fs = require( "fs" );
+var crypto = require( "crypto" );
 var socketio = require( "socket.io" );
 var gaze = require( "gaze" );
 
@@ -16,6 +17,13 @@ module.exports = function( basePath, port, debug ) {
 		}
 	}
 
+	function createChecksum( fullFile ) {
+		return crypto
+			.createHash( "md5" )
+			.update( fs.readFileSync( fullFile ).toString() )
+			.digest( "hex" );
+	}
+
 	var server = socketio.listen( port, {
 		"resource": "/cr",
 		"log level": debug ? 5 : 1,
@@ -26,7 +34,8 @@ module.exports = function( basePath, port, debug ) {
 		file: "client/css-reload.js"
 	} );
 
-	var watchCache = {};
+	var socketCache = {};
+	var checksums = {};
 	var paths = [basePath + "/**/*.css"];
 
 	if ( debug ) {
@@ -40,12 +49,20 @@ module.exports = function( basePath, port, debug ) {
 	gaze( paths, function() {
 		this.on( "changed", function( fullFile ) {
 			var file = fullFile.replace( basePath, "" );
-			console.log( "[CR] File '%s' changed", file );
+			var checksum = createChecksum( fullFile );
+
+			if ( checksums[fullFile] === checksum ) {
+				log( "Gaze said '%s' changed, but checksum is the same", file );
+				return;
+			}
+
+			checksums[fullFile] = checksum;
+			console.log( "[CR] '%s' changed", file );
 
 			if ( file === "/client/css-reload.js" ) {
 				server.sockets.emit( "reloadPage" );
 			} else {
-				var cache = watchCache[fullFile];
+				var cache = socketCache[fullFile];
 				if ( cache ) {
 					fetchFile( fullFile, function( content ) {
 						cache.forEach( function( socket ) {
@@ -65,7 +82,12 @@ module.exports = function( basePath, port, debug ) {
 
 	function watchFile( socket, file ) {
 		var fullFile = path.normalize( basePath + file );
-		var cache = watchCache[fullFile] = watchCache[fullFile] || [];
+		var cache = socketCache[fullFile];
+
+		if ( !cache ) {
+			cache = socketCache[fullFile] = [];
+			checksums[fullFile] = createChecksum( fullFile );
+		}
 
 		cache.push( socket );
 
