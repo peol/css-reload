@@ -9,10 +9,10 @@ var socketio = require( "socket.io" );
 var gaze = require( "gaze" );
 
 module.exports = function( basePath, port, debug ) {
-	function log() {
+	function log( ) {
 		if ( debug ) {
 			var args = Array.prototype.slice.call( arguments );
-			args[0] = "[CR] " + args[0];
+			args[ 0 ] = "[CR] " + args[ 0 ];
 			console.log.apply( console, args );
 		}
 	}
@@ -20,7 +20,7 @@ module.exports = function( basePath, port, debug ) {
 	function createChecksum( fullFile ) {
 		return crypto
 			.createHash( "md5" )
-			.update( fs.readFileSync( fullFile ).toString() )
+			.update( fs.readFileSync( fullFile ).toString( ) )
 			.digest( "hex" );
 	}
 
@@ -34,9 +34,9 @@ module.exports = function( basePath, port, debug ) {
 		file: "client/css-reload.js"
 	} );
 
-	var socketCache = {};
-	var checksums = {};
-	var paths = [basePath + "/**/*.css"];
+	var socketCache = { };
+	var checksums = { };
+	var paths = [ basePath + "/**/*.css" ];
 
 	if ( debug ) {
 		paths.push( basePath + "/client/css-reload.js" );
@@ -46,23 +46,23 @@ module.exports = function( basePath, port, debug ) {
 	console.log( "[CR] Base path: '%s'", basePath );
 	console.log( "[CR] Tag to add to your document: <script src=\"http://localhost:%d/cr/css-reload.js\"></script>", port );
 
-	gaze( paths, function() {
+	gaze( paths, function( ) {
 		this.on( "changed", function( fullFile ) {
 			var file = fullFile.replace( basePath, "" );
 			var checksum = createChecksum( fullFile );
 
-			if ( checksums[fullFile] === checksum ) {
+			if ( checksums[ fullFile ] === checksum ) {
 				log( "Gaze said '%s' changed, but checksum is the same", file );
 				return;
 			}
 
-			checksums[fullFile] = checksum;
+			checksums[ fullFile ] = checksum;
 			console.log( "[CR] '%s' changed", file );
 
 			if ( file === "/client/css-reload.js" ) {
 				server.sockets.emit( "reloadPage" );
 			} else {
-				var cache = socketCache[fullFile];
+				var cache = socketCache[ fullFile ];
 				if ( cache ) {
 					fetchFile( fullFile, function( content ) {
 						cache.forEach( function( socket ) {
@@ -77,19 +77,22 @@ module.exports = function( basePath, port, debug ) {
 	function fetchFile( fullFile, callback ) {
 		// todo: support external URLs as well?
 		log( "Read contents of file '%s'", fullFile );
-		callback( fs.readFileSync( fullFile ).toString() );
+		callback( fs.readFileSync( fullFile ).toString( ) );
 	}
 
-	function watchFile( socket, file ) {
-		var fullFile = path.normalize( basePath + file );
-		var cache = socketCache[fullFile];
+	function watchFile( socket, fullFile, file ) {
+		var cache = socketCache[ fullFile ];
 
 		if ( !cache ) {
-			cache = socketCache[fullFile] = [];
-			checksums[fullFile] = createChecksum( fullFile );
+			cache = socketCache[ fullFile ] = [ ];
+			checksums[ fullFile ] = createChecksum( fullFile );
 		}
 
 		cache.push( socket );
+
+		fetchFile( fullFile, function( content ) {
+			socket.emit( "fileChanged", file, content );
+		} );
 
 		socket.on( "disconnect", function( ) {
 			log( "Stopped watching '%s' for socket '%s'", file, socket.id );
@@ -99,11 +102,29 @@ module.exports = function( basePath, port, debug ) {
 
 	server.on( "connection", function( socket ) {
 		console.log( "[CR] Socket '%s' connected", socket.id );
-		socket.on( "fileAdded", function( file ) {
-			log( "Started watching '%s' for socket '%s'", file, socket.id );
-			watchFile( socket, file );
+
+		socket.on( "addFile", function( file ) {
+			var fullFile = path.normalize( basePath + file );
+
+			if ( fs.existsSync( fullFile ) ) {
+				log( "Started watching '%s' for socket '%s'", file, socket.id );
+				watchFile( socket, fullFile, file );
+			} else {
+				log( "Socket '%s' tried to watch a non-existing file: '%s'", socket.id, fullFile );
+			}
 		} );
-		socket.on( "disconnect", function() {
+
+		socket.on( "removeFile", function( file ) {
+			var fullFile = path.normalize( basePath + file );
+			var cache = socketCache[ fullFile ];
+
+			if ( cache ) {
+				cache.splice( cache.indexOf( socket ), 1 );
+				log( "Unwatched '%s' for socket '%s'", file, socket.id );
+			}
+		} );
+
+		socket.on( "disconnect", function( ) {
 			console.log( "[CR] Socket '%s' disconnected", socket.id );
 		} );
 	} );

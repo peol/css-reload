@@ -5,31 +5,49 @@
  * MIT/GPL Dual License, use whatever fits your project.
  * Copyright(C) Andrée Hansson (@peolanha) 2013
  */
- ( function() {
+( function( ) {
 	"use strict";
 
-	var filesToWatch = [];
-	var fileToStyle = [];
 	var socket;
+	var files = {};
 
 	/**
 	 * Convert an array-like object into an actual array.
+	 *
+	 * @param {Object} The object to convert
+	 * @returns {Array} An array converted from the sent in object
 	 */
+
 	function toArray( arrayLike ) {
 		return Array.prototype.slice.call( arrayLike );
 	}
 
 	/**
+	 * Convenience method for logging, mostly to easily disable it in the future.
+	 */
+
+	function log( ) {
+		var args = Array.prototype.slice.call( arguments );
+		args[ 0 ] = "[CR] " + args[ 0 ];
+		console.log.apply( console, args );
+	}
+
+	/**
 	 * Normalize a filename by removing origin URL and making sure it's
 	 * always an absolute URL. Also resolves relative URLs like foo/../bar.
+	 *
+	 * @param {String} href The URL to normalize
+	 * @param {String} [parent] Parent to prefix the `href` URL with
+	 * @returns {String} A normalized (absolute) URL
 	 */
-	function normalize( file, parent ) {
-		var path = file.replace( location.origin, "" );
-		var normalized = [];
+
+	function normalize( href, parent ) {
+		var path = href.replace( location.origin, "" );
+		var normalized = [ ];
 
 		path.split( "/" ).forEach( function( part ) {
 			if ( part === ".." ) {
-				normalized.pop();
+				normalized.pop( );
 			} else {
 				normalized.push( part );
 			}
@@ -37,7 +55,7 @@
 
 		path = normalized.join( "/" );
 
-		if ( path[0] !== "/" ) {
+		if ( path[ 0 ] !== "/" ) {
 			if ( !parent ) {
 				path = location.pathname + path;
 			} else {
@@ -45,176 +63,210 @@
 			}
 		}
 
-		return path.split( "?" )[0];
+		return path.split( "?" )[ 0 ];
 	}
 
 	/**
-	 * Add a file to watch list. By doing this it will replace the <link> element
-	 * with an <style> element. This is done because we want to make sure that
-	 * CSS inheritance works, even in cases with @import statements and we don't
-	 * want to reload unnecessary files (i.e the @import statements) since those files
-	 * are already handled individually.
+	 * Adds a file to CR, effectively starting to watch it and its dependencies (@imports).
+	 *
+	 * @param {String} file The file to watch
+	 * @param {String} media The media this style triggers on
+	 * @param {DOMElement} [insertBefore] An element which should be used when inserting this element into DOM
 	 */
-	function add( file, style, media ) {
-		if ( filesToWatch.indexOf( file ) === -1 ) {
-			media = media.length ? media : ["all"];
-			filesToWatch.push( file );
-			var elem = fileToStyle[file] = document.createElement( "style" );
-			elem.id = "CR-" + file;
-			elem.media = toArray( media ).join( "," );
 
-			if ( style.ownerNode ) {
-				style.ownerNode.parentElement.appendChild( elem );
-				style.ownerNode.parentElement.removeChild( style.ownerNode );
-			} else {
-				// todo: if this is an @import, we need to make sure its <style> element is added in the right
-				// order here
-				document.head.appendChild( elem );
-			}
-
-			if ( socket ) {
-				socket.emit( "fileAdded", file );
-			}
-
-			console.log( "[CR] Started watching '%s'", file );
+	function add( file, media, insertBefore, insertAfter ) {
+		var elem;
+		if ( !files[ file ] ) {
+			elem = document.createElement( "style" );
+			files[ file ] = {
+				elem: elem,
+				insertBefore: insertBefore
+			};
+			socket.emit( "addFile", file );
 		} else {
-			console.warn( "[CR] Already watching '%s', you probably have duplicates in your document -- css-reload does not behave correctly with duplicates!", file );
+			elem = files[ file ].elem;
 		}
+		elem.media = media;
+		elem.setAttribute( "data-file", file );
+		if ( insertBefore ) {
+			insertBefore.parentNode.insertBefore( elem, insertBefore );
+		} else if ( insertAfter ) {
+			insertAfter.parentNode.insertBefore( elem, insertAfter.nextSibling );
+		} else {
+			document.head.appendChild( elem );
+		}
+
+		return elem;
 	}
 
 	/**
-	 * Set the content of a watched file's CSS.
+	 * Removes a file from the watch list.
+	 *
+	 * @param {String} file The file path to remove
 	 */
-	function set( file, content, isInitial ) {
-		fileToStyle[file].innerHTML = content;
 
-		if ( !isInitial ) {
-			console.log( "[CR] Updated '%s'", file );
+	function remove( file ) {
+		var name = file.href || file;
+		var data = files[ name ];
+		data.elem.parentNode.removeChild( data.elem );
+		socket.emit( "removeFile", name );
+		delete files[ name ];
+		if ( file.imports ) {
+			file.imports.forEach( remove );
 		}
+		log( "Removed '%s'", name );
 	}
 
 	/**
-	 * Parses a CSSStyleSheet object and starts the watcher and
-	 * converter to set the stylesheet up for css-reloading.
+	 * Used initially to parse the document's stylesheets for files to watch.
+	 * It will only watch files which has an actual link (i.e. browsers may hide URL's on
+	 * style nodes if they're external).
+	 *
+	 * @param {CSSStyleSheet} style The style to start traversing from
+	 * @param {CSSMediaList} [media] The medialist for the `style`
 	 */
-	function parseStyle( style, media ) {
-		media = media || ["all"];
 
-		if ( !style.href ) {
-			return;
-		}
-
-		var file = normalize( style.href );
-		var content = "";
-
+	function addFromStyle( style, media ) {
 		toArray( style.cssRules ).forEach( function( rule ) {
 			if ( rule instanceof CSSImportRule ) {
-				parseStyle( rule.styleSheet, rule.media );
-			} else {
-				if ( rule.cssText ) {
-					content += rule.cssText + "\n";
-				}
+				addFromStyle( rule.styleSheet, rule.media );
 			}
 		} );
-
-		add( file, style, media );
-		set( file, content, true );
+		if ( style.href ) {
+			if ( style.ownerNode ) {
+				style.ownerNode.parentNode.removeChild( style.ownerNode );
+			}
+			add( normalize( style.href ), media && toArray( media ).join( ", " ) || "all" );
+		}
 	}
 
 	/**
-	 * Refreshes the watcher by parsing the document.styleSheets
-	 * list.
+	 * Triggered when the socket is connected and we can start interact
+	 * with it.
 	 */
-	function refresh() {
-		toArray( document.styleSheets ).forEach( function( style ) {
-			parseStyle( style );
-		} );
+
+	function connected( ) {
+		log( "Connected to back-end" );
+		toArray( document.styleSheets ).forEach( addFromStyle );
 	}
 
 	/**
-	 * Updates all converted @import <style> elements with the media
-	 * set in the CSS content. Returns CSS content with @import's
-	 * and comments stripped out.
+	 * Removes any comments left in the CSS source.
+	 *
+	 * @param {String} content The content string
+	 * @returns {String} An URL-stripped content string
 	 */
-	function updateImports( file, content ) {
+
+	function stripComments( content ) {
 		var re_comment = /\/\*([\s\S]+)?\*\//g;
-		var re_import = /@import (?:url\()?\s*["'](.+?)["']\s*(?:\))?\s*(?:(.+?))?;/g;
-		var m1;
-		var m2;
-		var style;
-		var normalized;
+		return content.replace( re_comment, "" );
+	}
 
-		// find all comments, and look inside them for @import's:
-		while ( m1 = re_comment.exec( content ) ) {
-			while ( m2 = re_import.exec( m1[1] ) ) {
-				normalized = normalize( m2[1] );
-				if ( fileToStyle[normalized] ) {
-					console.log( "[CR] File '%s' has been commented out -- unloading CSS on-the-fly is currently unsupported", normalized );
-				}
-			}
+	/**
+	 * Updates the string sent in to make sure @import statements are sync'd with
+	 * the file on disk (remove/add them and make sure they're in the right order).
+	 *
+	 * @param {String} file The file path to the file owning the content
+	 * @param {String} content The file content string
+	 * @returns {String} An @import-updated content string
+	 */
+
+	function updateAndStripImports( file, content ) {
+		var re_import = /@import\s+(?:url\()?(["']*)(.+)\1(?:\))?\s*(.*?);/g;
+		var oldImports = files[ file ].imports || [ ];
+		var newImports = files[ file ].imports = [ ];
+		var match, i;
+
+		// process all @import statements
+		while ( match = re_import.exec( content ) ) {
+			files[ file ].imports.push( {
+				href: normalize( match[ 2 ], file ),
+				media: match[ 3 ] || "all"
+			} );
 		}
 
-		// remove commented stuff:
-		content = content.replace( re_comment, "" );
-
-		// go through all @import's and update the (potential) media query for it:
-		while ( m1 = re_import.exec( content ) ) {
-			normalized = normalize( m1[1], file );
-			style = fileToStyle[normalized];
-			if ( style ) {
-				style.media = m1[2] || "all";
-			} else {
-				console.log( "[CR] File '%s' is new -- loading CSS on-the-fly is currently unsupported", normalized );
-			}
-		}
-
-		// remove all @import's:
+		// clean up @import statements
 		content = content.replace( re_import, "" );
+
+		// clean up old watched files
+		for ( i = 0; i < oldImports.length; i++ ) {
+			if ( !newImports.filter( function( f1 ) {
+				return !oldImports.filter( function( f2 ) {
+					return f2.href === f1.href;
+				} ).length;
+			} ).length ) {
+				remove( oldImports[ i ] );
+			}
+		}
+
+		// add new @import's to watched files
+		var prevElem = files[ file ].elem;
+		newImports.forEach( function( importedFile, i ) {
+			add( importedFile.href, importedFile.media, i === 0 ? prevElem : null, prevElem );
+			prevElem = files[ importedFile.href ].elem;
+		} );
 
 		return content;
 	}
 
 	/**
-	 * Bootstrap the reloader. It automatically injects
-	 * the socket.io stuff needed and starts the timer that
-	 * automatically refreshes the internal caches.
+	 * Parses the sent in string for any external resources and fixes their
+	 * paths to make sure they are correct before inserting the content into
+	 * an <style> element.
+	 *
+	 * @param {String} file The file path to the file owning the content
+	 * @param {String} content The file content string
 	 */
-	function run() {
-		var url = document.querySelector( "script[src*='css-reload.js']" ).src.split( "/css-reload.js" )[0];
-		var ioElem = document.createElement( "script" );
 
-		ioElem.onload = function() {
-			socket = io.connect( url.split( "/" ).slice( 0, -1 ).join( "/" ), {
-				resource: "cr"
-			} );
-
-			socket.on( "connect", function() {
-				// make sure that any pre-parsed files are added to the server watch list:
-				filesToWatch.forEach( function( file ) {
-					socket.emit( "fileAdded", file );
-				} );
-			} );
-
-			socket.on( "reloadPage", function() {
-				// used by CR when developing, automatically refreshes page when the css-reload.js
-				// file is changed. Could potentially be used in cases where a total reload of the document is needed.
-				location.reload();
-			} );
-
-			socket.on( "fileChanged", function( file, content ) {
-				// make sure we parse and clean the new content for @import's:
-				content = updateImports( file, content );
-				// update the CR <style> element with the new content:
-				set( file, content );
-			} );
-		};
-
-		refresh();
-		setInterval( refresh, 1000 );
-
-		ioElem.src = url + "/socket.io.js";
-		document.head.appendChild( ioElem );
+	function updateResourceURLs( file, content ) {
+		var re_url = /url\s*\(["'\s]*(.+?)["'\s]*\)/g;
+		return content.replace( re_url, function( matches, url ) {
+			return "url(" + normalize( url, file ) + ")";
+		} );
 	}
 
-	run();
-}() );
+	/**
+	 * Used internally for `updated` to modify the content to make sure it's
+	 * ready to be inserted into a <style> element.
+	 *
+	 * @param {String} file The file which the content resides in
+	 * @param {String} content The content to parse and modify
+	 * @returns {String} An updated `content` string
+	 */
+
+	function updateContent( file, content ) {
+		content = stripComments( content );
+		content = updateAndStripImports( file, content );
+		content = updateResourceURLs( file, content );
+		return content;
+	}
+
+	/**
+	 * Triggered when a file has been changed on the harddrive.
+	 *
+	 * @param {String} file The file that changed
+	 * @param {String} content The files content
+	 */
+
+	function updated( file, content ) {
+		// TODO: parse content for @import's
+		files[ file ].elem.innerHTML = updateContent( file, content );
+		log( "Updated '%s'", file );
+	}
+
+	var url = document.querySelector( "script[src*='css-reload.js']" ).src.split( "/css-reload.js" )[ 0 ];
+	var ioElem = document.createElement( "script" );
+
+	ioElem.onload = function( ) {
+		socket = io.connect( url.split( "/" ).slice( 0, -1 ).join( "/" ), {
+			resource: "cr"
+		} );
+
+		socket.on( "connect", connected );
+		socket.on( "reloadPage", location.reload.bind( location ) );
+		socket.on( "fileChanged", updated );
+	};
+
+	ioElem.src = url + "/socket.io.js";
+	document.head.appendChild( ioElem );
+}( ) );
